@@ -2,249 +2,152 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BotCord Pro | Discord Client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bot Client Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #313338; color: #dbdee1; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .message-hover:hover { background-color: #2e3035; }
-        .emoji-btn:hover { transform: scale(1.2); }
-        #chat-messages { scroll-behavior: smooth; }
-        .proxy-active { color: #f23f42; font-weight: bold; }
+        body { background-color: #313338; color: #dbdee1; font-family: sans-serif; }
+        .server-btn:hover { border-radius: 15px; background: #5865f2; }
+        .active-chan { background-color: #3f4147; color: white; }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden">
 
-    <!-- LOGIN SCREEN -->
-    <div id="login-overlay" class="fixed inset-0 bg-[#1e1f22] z-[100] flex items-center justify-center p-4">
-        <div class="bg-[#313338] p-8 rounded-lg shadow-2xl w-full max-w-md border border-[#ffffff0a]">
-            <div class="text-center mb-8">
-                <i class="fa-brands fa-discord text-5xl text-[#5865f2] mb-4"></i>
-                <h1 class="text-2xl font-bold text-white">Bot Management</h1>
-                <p class="text-[#b5bac1] text-sm">Enter your bot token to start spying—err, managing.</p>
-            </div>
-            
-            <label class="text-xs font-bold text-[#b5bac1] uppercase mb-2 block">Bot Token</label>
-            <input type="password" id="bot-token" class="w-full p-3 bg-[#1e1f22] rounded border-none focus:ring-2 focus:ring-[#5865f2] mb-4 text-white outline-none" placeholder="OTk0...">
-            
-            <div class="flex items-center mb-6 bg-[#2b2d31] p-3 rounded">
-                <input type="checkbox" id="use-proxy" class="w-4 h-4 text-[#5865f2] rounded border-none focus:ring-0">
-                <label for="use-proxy" class="ml-3 text-sm text-[#dbdee1]">Use CORS Proxy (Required for iOS/Web)</label>
-            </div>
-
-            <button onclick="initConnection()" class="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white py-3 rounded font-bold transition-all shadow-lg">Login</button>
+    <div id="login-screen" class="fixed inset-0 bg-[#1e1f22] z-[100] flex items-center justify-center p-4">
+        <div class="bg-[#313338] p-6 rounded-lg w-full max-w-sm shadow-2xl text-center">
+            <h1 class="text-xl font-bold mb-4">Bot Token Login</h1>
+            <input type="password" id="token-input" class="w-full p-3 bg-[#1e1f22] rounded mb-4 outline-none text-white" placeholder="Paste Token Here">
+            <button onclick="start()" class="w-full bg-[#5865f2] p-3 rounded font-bold">Connect</button>
+            <p class="text-[10px] text-gray-500 mt-4">If it fails, ensure Bot Intents are enabled in Dev Portal.</p>
         </div>
     </div>
 
-    <!-- SIDEBAR: SERVERS -->
-    <nav class="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 overflow-y-auto no-scrollbar flex-shrink-0">
-        <div class="w-12 h-12 bg-[#313338] rounded-[24px] flex items-center justify-center text-[#23a559] hover:bg-[#23a559] hover:text-white transition-all cursor-pointer group mb-1">
-            <i class="fa-brands fa-discord text-2xl"></i>
-        </div>
-        <div class="w-8 h-[2px] bg-[#35363c] rounded-full mx-auto"></div>
-        <div id="server-list" class="flex flex-col space-y-2 py-2">
-            <!-- Servers appear here -->
-        </div>
-    </nav>
+    <div class="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 flex-shrink-0 overflow-y-auto">
+        <div id="guild-list" class="space-y-2"></div>
+    </div>
 
-    <!-- SIDEBAR: CHANNELS -->
-    <aside class="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0">
-        <header class="h-12 flex items-center px-4 border-b border-[#1f2124] shadow-sm">
-            <h2 id="current-server-name" class="font-bold text-white truncate text-sm">Select a Server</h2>
-        </header>
-        <div id="channel-list" class="flex-1 overflow-y-auto p-2 space-y-[2px]">
-            <!-- Channels appear here -->
+    <div class="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0">
+        <div id="guild-name" class="h-12 border-b border-black/20 flex items-center px-4 font-bold text-sm truncate">Channels</div>
+        <div id="chan-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+    </div>
+
+    <div class="flex-1 flex flex-col bg-[#313338] min-w-0">
+        <div class="h-12 border-b border-black/20 flex items-center px-4 font-bold shadow-sm">
+            <span class="text-gray-500 mr-2">#</span> <span id="chan-name">select-a-channel</span>
         </div>
-    </aside>
-
-    <!-- MAIN CHAT AREA -->
-    <main class="flex-1 flex flex-col min-w-0 bg-[#313338]">
-        <header class="h-12 flex items-center justify-between px-4 border-b border-[#1f2124] shadow-sm flex-shrink-0">
-            <div class="flex items-center font-bold text-white">
-                <i class="fa-solid fa-hashtag text-[#80848e] mr-2 text-xl"></i>
-                <span id="current-channel-name" class="truncate">Select Channel</span>
-            </div>
-        </header>
-
-        <!-- MESSAGES -->
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1">
-            <div class="text-center text-[#949ba4] mt-20">
-                <i class="fa-solid fa-comments text-5xl mb-4 opacity-20"></i>
-                <p>Welcome to the beginning of the channel history.</p>
+        <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+        
+        <div class="p-4">
+            <div class="bg-[#383a40] rounded-lg flex items-center p-2">
+                <button onclick="addEmoji('💀')" class="p-2 text-gray-400">💀</button>
+                <input type="text" id="msg-input" class="bg-transparent flex-1 px-2 outline-none text-sm" placeholder="Message...">
+                <button onclick="sendMsg()" class="text-[#5865f2] px-3 font-bold">SEND</button>
             </div>
         </div>
-
-        <!-- INPUT BOX -->
-        <footer class="px-4 pb-6">
-            <div id="emoji-tray" class="hidden flex-wrap gap-2 p-3 bg-[#2b2d31] border border-[#1f2124] rounded-t-lg">
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('😀')">😀</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('😂')">😂</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('😍')">😍</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('🔥')">🔥</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('👍')">👍</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('💀')">💀</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('💯')">💯</span>
-                <span class="emoji-btn cursor-pointer text-xl" onclick="addEmoji('✨')">✨</span>
-            </div>
-            <div class="bg-[#383a40] rounded-lg flex items-center p-2 shadow-inner">
-                <button onclick="toggleEmoji()" class="p-2 text-[#b5bac1] hover:text-white transition">
-                    <i class="fa-solid fa-face-smile text-xl"></i>
-                </button>
-                <input type="text" id="msg-input" class="bg-transparent flex-1 px-2 text-[#dbdee1] outline-none placeholder-[#949ba4]" placeholder="Select a channel first...">
-                <button onclick="sendMessage()" class="bg-[#5865f2] hover:bg-[#4752c4] text-white px-4 py-2 rounded-md font-bold text-sm transition flex items-center">
-                    <span class="hidden sm:inline mr-2">Send</span>
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </div>
-        </footer>
-    </main>
+    </div>
 
     <script>
-    let TOKEN = "";
-    let ACTIVE_GUILD = "";
-    let ACTIVE_CHAN = "";
-    // Using a simpler proxy that doesn't require manual activation
-    let PROXY_BASE = "https://corsproxy.io/?"; 
+        let TOKEN = "";
+        let CID = ""; // Current Channel ID
+        // This proxy is specifically for bypassing CORS on browsers
+        const PROXY = "https://api.allorigins.win/raw?url=";
 
-    function log(msg, isError = false) {
-        const debug = document.getElementById('debug-log');
-        debug.innerHTML = `<span class="${isError ? 'text-red-500' : 'text-green-500'}">[${new Date().toLocaleTimeString()}] ${msg}</span>`;
-    }
+        async function request(path, method = "GET", body = null) {
+            const url = `https://discord.com/api/v10${path}`;
+            const headers = { "Authorization": `Bot ${TOKEN}`, "Content-Type": "application/json" };
+            
+            // We use AllOrigins proxy to wrap the request
+            const response = await fetch(PROXY + encodeURIComponent(url), {
+                method: method,
+                headers: (method === "GET") ? { "Authorization": `Bot ${TOKEN}` } : headers,
+                body: body ? JSON.stringify(body) : null
+            });
 
-    async function api(path, method = "GET", body = null) {
-        const url = `${PROXY_BASE}${encodeURIComponent('https://discord.com/api/v10' + path)}`;
-        const options = {
-            method,
-            headers: { 
-                "Authorization": `Bot ${TOKEN}`, 
-                "Content-Type": "application/json" 
-            }
-        };
-        if (body) options.body = JSON.stringify(body);
-        
-        const res = await fetch(url, options);
-        if (!res.ok) {
-            log(`Error ${res.status} on ${path}`, true);
-            throw new Error(`API Error: ${res.status}`);
+            if (!response.ok) throw new Error(response.status);
+            return response.json();
         }
-        return res.json();
-    }
 
-    function initConnection() {
-        TOKEN = document.getElementById('bot-token').value.trim();
-        log("Attempting login...");
-        
-        api('/users/@me').then(data => {
-            log(`Logged in as ${data.username}`);
-            document.getElementById('login-overlay').style.display = 'none';
-            loadGuilds();
-        }).catch(err => {
-            log("Login Failed. Check token or proxy.", true);
-        });
-    }
+        function start() {
+            TOKEN = document.getElementById('token-input').value.trim();
+            request('/users/@me').then(() => {
+                document.getElementById('login-screen').style.display = 'none';
+                loadGuilds();
+            }).catch(() => alert("Token Invalid or Proxy Error"));
+        }
 
-    async function loadGuilds() {
-        try {
-            const guilds = await api('/users/@me/guilds');
-            const list = document.getElementById('server-list');
-            list.innerHTML = guilds.map(g => `
-                <div onclick="loadChannels('${g.id}', '${g.name.replace(/'/g, "")}')" 
-                     class="w-12 h-12 bg-[#313338] text-white rounded-[24px] flex items-center justify-center server-icon overflow-hidden hover:rounded-[16px] hover:bg-[#5865f2] transition-all cursor-pointer">
+        async function loadGuilds() {
+            const guilds = await request('/users/@me/guilds');
+            document.getElementById('guild-list').innerHTML = guilds.map(g => `
+                <div onclick="loadChans('${g.id}', '${g.name.replace(/'/g,"")}')" class="w-12 h-12 bg-[#313338] rounded-[24px] flex items-center justify-center cursor-pointer transition-all server-btn overflow-hidden">
                     ${g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" class="w-full h-full">` : g.name[0]}
                 </div>
             `).join('');
-            log(`Loaded ${guilds.length} servers`);
-        } catch(e) { log("Failed to load guilds", true); }
-    }
-
-    async function loadChannels(id, name) {
-        ACTIVE_GUILD = id;
-        document.getElementById('current-server-name').innerText = name;
-        const list = document.getElementById('channel-list');
-        list.innerHTML = '<div class="p-4 text-xs text-gray-500 animate-pulse">Fetching...</div>';
-
-        try {
-            const channels = await api(`/guilds/${id}/channels`);
-            // Filter for Text, Announcement, and Threads
-            const textChans = channels.filter(c => [0, 5, 11, 12].includes(c.type));
-
-            if (textChans.length === 0) {
-                list.innerHTML = '<div class="p-4 text-xs text-yellow-500">No text channels visible to bot.</div>';
-                return;
-            }
-
-            list.innerHTML = textChans.map(c => `
-                <div onclick="setChannel('${c.id}', '${c.name.replace(/'/g, "")}')" 
-                     id="chan-${c.id}"
-                     class="chan-item p-2 rounded hover:bg-[#35373c] text-[#8e9297] hover:text-[#dbdee1] cursor-pointer flex items-center group">
-                    <i class="fa-solid fa-hashtag mr-2 text-[#80848e]"></i> ${c.name}
-                </div>
-            `).join('');
-
-            log(`Found ${textChans.length} channels`);
-            // AUTO SELECT FIRST CHANNEL
-            setChannel(textChans[0].id, textChans[0].name);
-
-        } catch(e) { 
-            list.innerHTML = '<div class="p-4 text-xs text-red-500">Failed to load channels.</div>';
-            log("Channel Fetch Failed (Check Bot Perms)", true);
         }
-    }
 
-    function setChannel(id, name) {
-        ACTIVE_CHAN = id;
-        document.querySelectorAll('.chan-item').forEach(el => el.classList.remove('bg-[#3f4147]', 'text-white'));
-        const activeEl = document.getElementById(`chan-${id}`);
-        if(activeEl) activeEl.classList.add('bg-[#3f4147]', 'text-white');
+        async function loadChans(gid, gname) {
+            document.getElementById('guild-name').innerText = gname;
+            const list = document.getElementById('chan-list');
+            list.innerHTML = "Loading...";
 
-        document.getElementById('current-channel-name').innerText = name;
-        document.getElementById('msg-input').placeholder = `Message #${name}`;
-        fetchMessages();
-    }
-
-    async function fetchMessages() {
-        if (!ACTIVE_CHAN) return;
-        try {
-            const msgs = await api(`/channels/${ACTIVE_CHAN}/messages?limit=50`);
-            const chat = document.getElementById('chat-messages');
-            
-            chat.innerHTML = msgs.reverse().map(m => `
-                <div class="flex px-1 py-1 message-hover rounded mb-1">
-                    <div class="w-10 h-10 rounded-full bg-[#5865f2] mr-4 flex-shrink-0 flex items-center justify-center text-white font-bold text-xs">
-                        ${m.author.username[0].toUpperCase()}
+            try {
+                const chans = await request(`/guilds/${gid}/channels`);
+                // Filters for text-based channels
+                const filtered = chans.filter(c => [0, 5, 11, 12].includes(c.type));
+                
+                list.innerHTML = filtered.map(c => `
+                    <div onclick="selectChan('${c.id}', '${c.name}')" id="btn-${c.id}" class="p-2 rounded text-gray-400 hover:bg-[#35373c] hover:text-white cursor-pointer text-sm truncate flex items-center">
+                        <span class="mr-2 opacity-50">#</span> ${c.name}
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-baseline space-x-2">
-                            <span class="font-bold text-white text-sm">${m.author.username}</span>
-                            <span class="text-[9px] text-[#949ba4]">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        </div>
-                        <div class="text-[#dbdee1] text-sm break-words">${m.content || '<span class="text-gray-500 italic text-xs">Embed/Image</span>'}</div>
+                `).join('');
+
+                // AUTO SELECT FIRST CHANNEL
+                if (filtered.length > 0) selectChan(filtered[0].id, filtered[0].name);
+
+            } catch (e) {
+                list.innerHTML = `<div class="text-red-500 p-2 text-xs">Error ${e.message}. Bot might lack 'View Channels' perm.</div>`;
+            }
+        }
+
+        function selectChan(id, name) {
+            CID = id;
+            document.getElementById('chan-name').innerText = name;
+            document.querySelectorAll('[id^="btn-"]').forEach(el => el.classList.remove('active-chan'));
+            document.getElementById(`btn-${id}`)?.classList.add('active-chan');
+            loadMsgs();
+        }
+
+        async function loadMsgs() {
+            if (!CID) return;
+            const msgs = await request(`/channels/${CID}/messages?limit=40`);
+            const box = document.getElementById('chat-box');
+            box.innerHTML = msgs.reverse().map(m => `
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-white text-sm">${m.author.username}</span>
+                        <span class="text-[10px] text-gray-500">${new Date(m.timestamp).toLocaleTimeString()}</span>
                     </div>
+                    <div class="text-sm text-gray-300">${m.content || '<i class="opacity-30">Embed/Image</i>'}</div>
                 </div>
             `).join('');
-            chat.scrollTop = chat.scrollHeight;
-        } catch(e) { console.error(e); }
-    }
+            box.scrollTop = box.scrollHeight;
+        }
 
-    async function sendMessage() {
-        const input = document.getElementById('msg-input');
-        const content = input.value.trim();
-        if (!content || !ACTIVE_CHAN) return;
-        input.value = "";
-        try {
-            await api(`/channels/${ACTIVE_CHAN}/messages`, "POST", { content });
-            fetchMessages();
-        } catch(e) { log("Send Failed (Missing Permissions)", true); }
-    }
+        async function sendMsg() {
+            const input = document.getElementById('msg-input');
+            const val = input.value.trim();
+            if (!val || !CID) return;
+            input.value = "";
+            try {
+                await request(`/channels/${CID}/messages`, "POST", { content: val });
+                loadMsgs();
+            } catch (e) { alert("Send failed."); }
+        }
 
-    function toggleEmoji() { document.getElementById('emoji-tray').classList.toggle('hidden'); }
-    function addEmoji(e) { document.getElementById('msg-input').value += e; document.getElementById('msg-input').focus(); }
-
-    document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-    setInterval(() => { if(ACTIVE_CHAN) fetchMessages(); }, 4000);
-</script>
-
+        function addEmoji(e) { document.getElementById('msg-input').value += e; }
+        
+        // Auto-refresh messages every 3 seconds
+        setInterval(() => { if(CID) loadMsgs(); }, 3000);
+    </script>
 </body>
 </html>
