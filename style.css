@@ -1,0 +1,30 @@
+body {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.server-icon {
+    transition: all 0.2s ease;
+}
+
+.server-icon:hover {
+    border-radius: 16px;
+    background-color: #5865f2;
+}
+
+.active-chan {
+    background-color: #3f4147 !important;
+    color: white !important;
+}
+
+.message-item {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
