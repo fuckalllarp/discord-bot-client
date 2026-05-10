@@ -1,4 +1,4 @@
-const API_BASE = "https://45.134.39.212:4173/api"; 
+const API_BASE = "http://45.134.39.212:4173/api"; 
 let currentChan = null;
 let lastMsgId = null;
 
