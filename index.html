@@ -3,151 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bot Client Fix</title>
+    <title>BotCord | Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #313338; color: #dbdee1; font-family: sans-serif; }
-        .server-btn:hover { border-radius: 15px; background: #5865f2; }
-        .active-chan { background-color: #3f4147; color: white; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="h-screen flex overflow-hidden">
 
     <div id="login-screen" class="fixed inset-0 bg-[#1e1f22] z-[100] flex items-center justify-center p-4">
         <div class="bg-[#313338] p-6 rounded-lg w-full max-w-sm shadow-2xl text-center">
-            <h1 class="text-xl font-bold mb-4">Bot Token Login</h1>
-            <input type="password" id="token-input" class="w-full p-3 bg-[#1e1f22] rounded mb-4 outline-none text-white" placeholder="Paste Token Here">
-            <button onclick="start()" class="w-full bg-[#5865f2] p-3 rounded font-bold">Connect</button>
-            <p class="text-[10px] text-gray-500 mt-4">If it fails, ensure Bot Intents are enabled in Dev Portal.</p>
+            <i class="fa-brands fa-discord text-4xl text-[#5865f2] mb-4"></i>
+            <h1 class="text-xl font-bold mb-4 text-white">Bot Login</h1>
+            <input type="password" id="token-input" class="w-full p-3 bg-[#1e1f22] rounded mb-4 outline-none text-white border border-transparent focus:border-[#5865f2]" placeholder="Bot Token">
+            <button id="login-btn" class="w-full bg-[#5865f2] hover:bg-[#4752c4] p-3 rounded font-bold text-white transition">Connect</button>
+            <div id="login-status" class="mt-4 text-xs text-red-500 font-medium"></div>
         </div>
     </div>
 
-    <div class="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 flex-shrink-0 overflow-y-auto">
+    <nav class="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 flex-shrink-0 overflow-y-auto no-scrollbar">
         <div id="guild-list" class="space-y-2"></div>
-    </div>
+    </nav>
 
-    <div class="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0">
-        <div id="guild-name" class="h-12 border-b border-black/20 flex items-center px-4 font-bold text-sm truncate">Channels</div>
+    <aside class="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0">
+        <div id="guild-name" class="h-12 border-b border-black/20 flex items-center px-4 font-bold text-sm text-white truncate">Select Server</div>
         <div id="chan-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
-    </div>
+    </aside>
 
-    <div class="flex-1 flex flex-col bg-[#313338] min-w-0">
-        <div class="h-12 border-b border-black/20 flex items-center px-4 font-bold shadow-sm">
-            <span class="text-gray-500 mr-2">#</span> <span id="chan-name">select-a-channel</span>
-        </div>
-        <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+    <main class="flex-1 flex flex-col bg-[#313338] min-w-0">
+        <header class="h-12 border-b border-black/20 flex items-center px-4 font-bold shadow-sm">
+            <span class="text-gray-500 mr-2 text-xl">#</span> 
+            <span id="chan-name" class="text-white">select-channel</span>
+        </header>
         
-        <div class="p-4">
+        <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="text-center text-gray-500 mt-20 italic">No messages to show.</div>
+        </div>
+        
+        <footer class="p-4">
             <div class="bg-[#383a40] rounded-lg flex items-center p-2">
-                <button onclick="addEmoji('💀')" class="p-2 text-gray-400">💀</button>
-                <input type="text" id="msg-input" class="bg-transparent flex-1 px-2 outline-none text-sm" placeholder="Message...">
-                <button onclick="sendMsg()" class="text-[#5865f2] px-3 font-bold">SEND</button>
+                <input type="text" id="msg-input" class="bg-transparent flex-1 px-2 outline-none text-sm text-white" placeholder="Message...">
+                <button id="send-btn" class="text-[#5865f2] px-3 font-bold hover:text-white transition">SEND</button>
             </div>
-        </div>
-    </div>
+        </footer>
+    </main>
 
-    <script>
-        let TOKEN = "";
-        let CID = ""; // Current Channel ID
-        // This proxy is specifically for bypassing CORS on browsers
-        const PROXY = "https://api.allorigins.win/raw?url=";
-
-        async function request(path, method = "GET", body = null) {
-            const url = `https://discord.com/api/v10${path}`;
-            const headers = { "Authorization": `Bot ${TOKEN}`, "Content-Type": "application/json" };
-            
-            // We use AllOrigins proxy to wrap the request
-            const response = await fetch(PROXY + encodeURIComponent(url), {
-                method: method,
-                headers: (method === "GET") ? { "Authorization": `Bot ${TOKEN}` } : headers,
-                body: body ? JSON.stringify(body) : null
-            });
-
-            if (!response.ok) throw new Error(response.status);
-            return response.json();
-        }
-
-        function start() {
-            TOKEN = document.getElementById('token-input').value.trim();
-            request('/users/@me').then(() => {
-                document.getElementById('login-screen').style.display = 'none';
-                loadGuilds();
-            }).catch(() => alert("Token Invalid or Proxy Error"));
-        }
-
-        async function loadGuilds() {
-            const guilds = await request('/users/@me/guilds');
-            document.getElementById('guild-list').innerHTML = guilds.map(g => `
-                <div onclick="loadChans('${g.id}', '${g.name.replace(/'/g,"")}')" class="w-12 h-12 bg-[#313338] rounded-[24px] flex items-center justify-center cursor-pointer transition-all server-btn overflow-hidden">
-                    ${g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" class="w-full h-full">` : g.name[0]}
-                </div>
-            `).join('');
-        }
-
-        async function loadChans(gid, gname) {
-            document.getElementById('guild-name').innerText = gname;
-            const list = document.getElementById('chan-list');
-            list.innerHTML = "Loading...";
-
-            try {
-                const chans = await request(`/guilds/${gid}/channels`);
-                // Filters for text-based channels
-                const filtered = chans.filter(c => [0, 5, 11, 12].includes(c.type));
-                
-                list.innerHTML = filtered.map(c => `
-                    <div onclick="selectChan('${c.id}', '${c.name}')" id="btn-${c.id}" class="p-2 rounded text-gray-400 hover:bg-[#35373c] hover:text-white cursor-pointer text-sm truncate flex items-center">
-                        <span class="mr-2 opacity-50">#</span> ${c.name}
-                    </div>
-                `).join('');
-
-                // AUTO SELECT FIRST CHANNEL
-                if (filtered.length > 0) selectChan(filtered[0].id, filtered[0].name);
-
-            } catch (e) {
-                list.innerHTML = `<div class="text-red-500 p-2 text-xs">Error ${e.message}. Bot might lack 'View Channels' perm.</div>`;
-            }
-        }
-
-        function selectChan(id, name) {
-            CID = id;
-            document.getElementById('chan-name').innerText = name;
-            document.querySelectorAll('[id^="btn-"]').forEach(el => el.classList.remove('active-chan'));
-            document.getElementById(`btn-${id}`)?.classList.add('active-chan');
-            loadMsgs();
-        }
-
-        async function loadMsgs() {
-            if (!CID) return;
-            const msgs = await request(`/channels/${CID}/messages?limit=40`);
-            const box = document.getElementById('chat-box');
-            box.innerHTML = msgs.reverse().map(m => `
-                <div class="flex flex-col">
-                    <div class="flex items-center space-x-2">
-                        <span class="font-bold text-white text-sm">${m.author.username}</span>
-                        <span class="text-[10px] text-gray-500">${new Date(m.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                    <div class="text-sm text-gray-300">${m.content || '<i class="opacity-30">Embed/Image</i>'}</div>
-                </div>
-            `).join('');
-            box.scrollTop = box.scrollHeight;
-        }
-
-        async function sendMsg() {
-            const input = document.getElementById('msg-input');
-            const val = input.value.trim();
-            if (!val || !CID) return;
-            input.value = "";
-            try {
-                await request(`/channels/${CID}/messages`, "POST", { content: val });
-                loadMsgs();
-            } catch (e) { alert("Send failed."); }
-        }
-
-        function addEmoji(e) { document.getElementById('msg-input').value += e; }
-        
-        // Auto-refresh messages every 3 seconds
-        setInterval(() => { if(CID) loadMsgs(); }, 3000);
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
