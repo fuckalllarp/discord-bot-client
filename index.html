@@ -105,11 +105,16 @@
     let TOKEN = "";
     let ACTIVE_GUILD = "";
     let ACTIVE_CHAN = "";
-    let PROXY = "";
+    // Using a simpler proxy that doesn't require manual activation
+    let PROXY_BASE = "https://corsproxy.io/?"; 
+
+    function log(msg, isError = false) {
+        const debug = document.getElementById('debug-log');
+        debug.innerHTML = `<span class="${isError ? 'text-red-500' : 'text-green-500'}">[${new Date().toLocaleTimeString()}] ${msg}</span>`;
+    }
 
     async function api(path, method = "GET", body = null) {
-        // Updated proxy logic to be more reliable
-        const url = `${PROXY}https://discord.com/api/v10${path}`;
+        const url = `${PROXY_BASE}${encodeURIComponent('https://discord.com/api/v10' + path)}`;
         const options = {
             method,
             headers: { 
@@ -118,22 +123,25 @@
             }
         };
         if (body) options.body = JSON.stringify(body);
+        
         const res = await fetch(url, options);
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+        if (!res.ok) {
+            log(`Error ${res.status} on ${path}`, true);
+            throw new Error(`API Error: ${res.status}`);
+        }
         return res.json();
     }
 
     function initConnection() {
         TOKEN = document.getElementById('bot-token').value.trim();
-        const useProxy = document.getElementById('use-proxy').checked;
-        // If proxy is checked, we use the heroku proxy
-        PROXY = useProxy ? "https://cors-anywhere.herokuapp.com/" : "";
+        log("Attempting login...");
         
         api('/users/@me').then(data => {
+            log(`Logged in as ${data.username}`);
             document.getElementById('login-overlay').style.display = 'none';
             loadGuilds();
         }).catch(err => {
-            alert("Login Failed! If using iOS, make sure the 'Use Proxy' box is checked.");
+            log("Login Failed. Check token or proxy.", true);
         });
     }
 
@@ -147,23 +155,23 @@
                     ${g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" class="w-full h-full">` : g.name[0]}
                 </div>
             `).join('');
-        } catch(e) { console.error(e); }
+            log(`Loaded ${guilds.length} servers`);
+        } catch(e) { log("Failed to load guilds", true); }
     }
 
     async function loadChannels(id, name) {
         ACTIVE_GUILD = id;
         document.getElementById('current-server-name').innerText = name;
         const list = document.getElementById('channel-list');
-        list.innerHTML = '<div class="p-4 text-xs text-gray-500 animate-pulse">Loading channels...</div>';
+        list.innerHTML = '<div class="p-4 text-xs text-gray-500 animate-pulse">Fetching...</div>';
 
         try {
             const channels = await api(`/guilds/${id}/channels`);
-            
-            // Filter for ALL viewable text-based channels: 0=Text, 5=Announcement, 11/12=Threads
+            // Filter for Text, Announcement, and Threads
             const textChans = channels.filter(c => [0, 5, 11, 12].includes(c.type));
 
             if (textChans.length === 0) {
-                list.innerHTML = '<div class="p-4 text-xs text-red-400">No text channels found. Check bot permissions!</div>';
+                list.innerHTML = '<div class="p-4 text-xs text-yellow-500">No text channels visible to bot.</div>';
                 return;
             }
 
@@ -175,19 +183,18 @@
                 </div>
             `).join('');
 
-            // --- AUTO SELECT THE FIRST CHANNEL ---
-            const firstChan = textChans[0];
-            setChannel(firstChan.id, firstChan.name);
+            log(`Found ${textChans.length} channels`);
+            // AUTO SELECT FIRST CHANNEL
+            setChannel(textChans[0].id, textChans[0].name);
 
         } catch(e) { 
             list.innerHTML = '<div class="p-4 text-xs text-red-500">Failed to load channels.</div>';
+            log("Channel Fetch Failed (Check Bot Perms)", true);
         }
     }
 
     function setChannel(id, name) {
         ACTIVE_CHAN = id;
-        
-        // Update UI highlights
         document.querySelectorAll('.chan-item').forEach(el => el.classList.remove('bg-[#3f4147]', 'text-white'));
         const activeEl = document.getElementById(`chan-${id}`);
         if(activeEl) activeEl.classList.add('bg-[#3f4147]', 'text-white');
@@ -203,58 +210,40 @@
             const msgs = await api(`/channels/${ACTIVE_CHAN}/messages?limit=50`);
             const chat = document.getElementById('chat-messages');
             
-            if (msgs.length === 0) {
-                chat.innerHTML = '<div class="text-center text-[#949ba4] mt-20 text-sm">No messages here yet.</div>';
-                return;
-            }
-
             chat.innerHTML = msgs.reverse().map(m => `
                 <div class="flex px-1 py-1 message-hover rounded mb-1">
-                    <div class="w-10 h-10 rounded-full bg-[#5865f2] mr-4 flex-shrink-0 flex items-center justify-center text-white font-bold">
+                    <div class="w-10 h-10 rounded-full bg-[#5865f2] mr-4 flex-shrink-0 flex items-center justify-center text-white font-bold text-xs">
                         ${m.author.username[0].toUpperCase()}
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-baseline space-x-2">
                             <span class="font-bold text-white text-sm">${m.author.username}</span>
-                            <span class="text-[10px] text-[#949ba4]">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span class="text-[9px] text-[#949ba4]">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
-                        <div class="text-[#dbdee1] text-sm break-words">${m.content || '<span class="text-xs text-gray-500 italic">Embed/Image (Text Only Mode)</span>'}</div>
+                        <div class="text-[#dbdee1] text-sm break-words">${m.content || '<span class="text-gray-500 italic text-xs">Embed/Image</span>'}</div>
                     </div>
                 </div>
             `).join('');
             chat.scrollTop = chat.scrollHeight;
-        } catch(e) { console.error("Msg Error:", e); }
+        } catch(e) { console.error(e); }
     }
 
     async function sendMessage() {
         const input = document.getElementById('msg-input');
         const content = input.value.trim();
         if (!content || !ACTIVE_CHAN) return;
-
         input.value = "";
         try {
             await api(`/channels/${ACTIVE_CHAN}/messages`, "POST", { content });
             fetchMessages();
-        } catch(e) { alert("Failed to send! Check bot permissions in this channel."); }
+        } catch(e) { log("Send Failed (Missing Permissions)", true); }
     }
 
-    function toggleEmoji() {
-        const tray = document.getElementById('emoji-tray');
-        tray.classList.toggle('hidden');
-    }
+    function toggleEmoji() { document.getElementById('emoji-tray').classList.toggle('hidden'); }
+    function addEmoji(e) { document.getElementById('msg-input').value += e; document.getElementById('msg-input').focus(); }
 
-    function addEmoji(emoji) {
-        const input = document.getElementById('msg-input');
-        input.value += emoji;
-        input.focus();
-    }
-
-    document.getElementById('msg-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-
-    // Refresh messages every 4 seconds
-    setInterval(fetchMessages, 4000);
+    document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+    setInterval(() => { if(ACTIVE_CHAN) fetchMessages(); }, 4000);
 </script>
 
 </body>
